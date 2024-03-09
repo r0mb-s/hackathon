@@ -47,7 +47,6 @@ def handle_data(id, time, distance):
     if distance < 250:
         car_counters[id] += 1
     if request_counters[id] == 10:
-        print(str(id) + " - " + str(request_counters[id]))
         edit_db.functie(id, car_counters[id] / request_counters[id])
         request_counters[id] = 0
         car_counters[id] = 0

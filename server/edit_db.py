@@ -39,12 +39,10 @@ def get_coordinates_and_percentage():
         dictionar = {}
 
         for row in result:
-                if result:
-                        longitude = row[1]
-                        latitude = row[2]
-                        percentage = row[3]
-                        dictionar[row[0]] = [latitude, longitude, percentage]
-                        
+                longitude = row[1]
+                latitude = row[2]
+                percentage = row[3]
+                dictionar[row[0]] = [latitude, longitude, percentage]
 
         cur.close()
         conn.close()
