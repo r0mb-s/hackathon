@@ -15,11 +15,30 @@ def get_numar():
         handle_data(numar.get("id"), numar.get("timestamp"), numar.get("distance"))
     return '', 200
 
+@app.route('/report', methods=['POST'])
+def get_report():
+    report = request.get_json()
+    if report is not None:
+        handle_report(report.get("id"), report.get("mesaj"))
+    return '', 200
+
 @app.route('/location_and_percentage', methods=['GET'])
 def percentage_route():
     result = edit_db.get_coordinates_and_percentage()
     return jsonify(result)
     
+def handle_report(id, mesaj):
+    conn = edit_db.get_con()
+    cur = conn.cursor()
+    cur.execute('CREATE TABLE IF NOT EXISTS reports (id integer PRIMARY KEY, mesaj varchar(300) NOT NULL);')
+    conn.commit()
+
+    cur.execute('INSERT INTO reports (id, mesaj) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET mesaj = %s;',
+                    (id, mesaj, mesaj))
+    
+    cur.close()
+    conn.close()
+
 def handle_data(id, time, distance):
     global request_counters, car_counters
 
