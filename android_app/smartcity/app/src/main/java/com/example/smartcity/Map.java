@@ -4,7 +4,13 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import android.Manifest;
+import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
@@ -17,12 +23,15 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
 import java.io.IOException;
+import java.util.Random;
 
 public class Map extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -36,7 +45,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
         mapSearchView = findViewById(R.id.map_search);
-        pinpointLocations();
+
         mapSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -95,6 +104,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         LatLng current_location = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         myMap.addMarker(new MarkerOptions().position(current_location).title("Current Location"));
         myMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current_location, 14.0f));
+        pinpointLocation(45.74741894478222, 21.231679568224354, 0.1);
     }
 
     @Override
@@ -111,7 +121,48 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
     }
 
     public void pinpointLocations() {
-        for (int i = 0; i < )
-        myMap.addMarker(new MarkerOptions().position().title(""));
+        Random rand = new Random();
+
+        for (int i = 1; i <= 10; i++) {
+            // Generate random latitudes and longitudes within some bounds
+            double lat = -90 + (90 - (-90)) * rand.nextDouble(); // Latitude between -90 and 90
+            double lng = -180 + (180 - (-180)) * rand.nextDouble(); // Longitude between -180 and 180
+
+            LatLng currentLocation = new LatLng(lat, lng);
+            myMap.addMarker(new MarkerOptions().position(currentLocation).title("Marker " + i).icon(setIcon(Map.this, R.drawable.baseline_flag_circle_24, "#ffffff")));
+        }
+    }
+
+    public static String getHexColor(double percentage) {
+
+        if (percentage >= 0 && percentage <= 1)
+            percentage = 1 - percentage;
+        else
+            percentage = 0;
+
+        int r = (int) (255 * (1 - percentage));
+        int g = (int) (255 * percentage);
+        int b = 0;
+
+        String hex = String.format("#%02X%02X%02X", r, g, b);
+
+        return hex;
+    }
+    public void pinpointLocation(double latitude, double longitude, double percentage) {
+        String hex = getHexColor(percentage);
+
+        LatLng currentLocation = new LatLng(latitude, longitude);
+        myMap.addMarker(new MarkerOptions().position(currentLocation).title("Marker " + String.valueOf(latitude) + " " + String.valueOf(longitude)).icon(setIcon(Map.this, R.drawable.baseline_flag_circle_24, hex)));
+    }
+
+    public BitmapDescriptor setIcon(Activity context, int drawableID, String color) {
+        Drawable drawable = ActivityCompat.getDrawable(context, drawableID);
+        drawable.setBounds(0, 0, drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight());
+        drawable.setColorFilter(Color.parseColor(color), PorterDuff.Mode.SRC_ATOP);
+        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawable.draw(canvas);
+        return BitmapDescriptorFactory.fromBitmap(bitmap);
+
     }
 }
