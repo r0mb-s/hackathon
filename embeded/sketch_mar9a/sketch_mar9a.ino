@@ -80,5 +80,5 @@ void httpPost(struct outputdata x)
 }
 void loop() {
   httpPost(dataCollection());
-  delay(100);
+  delay(500);
 }
