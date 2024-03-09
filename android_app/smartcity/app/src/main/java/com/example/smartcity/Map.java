@@ -1,4 +1,11 @@
 package com.example.smartcity;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,7 +20,9 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.SearchView;
 import android.widget.Toast;
 import android.location.Address;
@@ -27,8 +36,14 @@ import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Random;
@@ -38,10 +53,13 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
     private GoogleMap myMap;
     private SearchView mapSearchView;
     private final int FINE_PERMISSION_CODE = 1;
+    private List<Pinpoint> pinpoints;
     Location currentLocation;
     FusedLocationProviderClient fusedLocationProviderClient;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
         mapSearchView = findViewById(R.id.map_search);
@@ -104,7 +122,8 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         LatLng current_location = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         myMap.addMarker(new MarkerOptions().position(current_location).title("Current Location"));
         myMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current_location, 14.0f));
-        pinpointLocation(45.74741894478222, 21.231679568224354, 0.1);
+        new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
+        //create_link();
     }
 
     @Override
@@ -165,4 +184,140 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         return BitmapDescriptorFactory.fromBitmap(bitmap);
 
     }
+
+    private class FetchDataTask extends AsyncTask<String, Void, String> {
+
+        @Override
+        protected String doInBackground(String... params) {
+            if (params.length == 0) {
+                return null;
+            }
+            String response = performGetRequest(params[0]);
+            return response;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            Log.d("TRYING TO CONNECT", "CONNECTING");
+            if (result != null) {
+                try {
+                    Log.e("This is the result: ", result);
+                    pinpoints = new ArrayList<Pinpoint>() ;
+                    JSONObject jsonObject = new JSONObject(result);
+
+                    // Iterate over the keys of the JSONObject
+                    Iterator<String> keys = jsonObject.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        JSONArray coordinates = jsonObject.getJSONArray(key); // Get the JSONArray associated with the key
+
+                        // Extract latitude, longitude, and percentage from the JSONArray
+                        double latitude = coordinates.getDouble(0);
+                        double longitude = coordinates.getDouble(1);
+                        double percentage = coordinates.getDouble(2);
+                        Pinpoint p = new Pinpoint(latitude, longitude, percentage);
+                        pinpoints.add(p);
+                        pinpointLocation(latitude, longitude, percentage);
+
+                    }
+
+
+                    // Update UI elements here based on extracted data
+                    // Note: You must switch to the main thread to update UI elements
+
+                } catch (JSONException e) {
+                    Log.e("FetchDataTask", "Json parsing error: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private String performGetRequest(String urlString) {
+        HttpURLConnection urlConnection = null;
+        BufferedReader reader = null;
+        String responseJsonStr = null;
+
+        try {
+            URL url = new URL(urlString);
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setRequestMethod("GET");
+            urlConnection.connect();
+
+            InputStream inputStream = urlConnection.getInputStream();
+            StringBuffer buffer = new StringBuffer();
+            if (inputStream == null) {
+                // Nothing to do.
+                return null;
+            }
+            reader = new BufferedReader(new InputStreamReader(inputStream));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                buffer.append(line + "\n");
+            }
+
+            if (buffer.length() == 0) {
+                // Stream was empty. No point in parsing.
+                return null;
+            }
+            responseJsonStr = buffer.toString();
+        } catch (IOException e) {
+            Log.e("PlaceholderFragment", "Error ", e);
+            return null;
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
+            }
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (final IOException e) {
+                    Log.e("PlaceholderFragment", "Error closing stream", e);
+                }
+            }
+        }
+
+        return responseJsonStr;
+    }
+
+   /*public void create_link() {
+       String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + 45.76011756878361 + "," + 21.218371237283456 +
+               "&destination=" + 45.76308144719734 + "," + 21.210420656098492 + "&key=" + ;
+
+// Make a request to the Directions API
+       RequestQueue queue = Volley.newRequestQueue(context);
+       StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+               new Response.Listener<String>() {
+                   @Override
+                   public void onResponse(String response) {
+                       // Parse the JSON response
+                       try {
+                           JSONObject jsonResponse = new JSONObject(response);
+                           JSONArray routesArray = jsonResponse.getJSONArray("routes");
+                           JSONObject route = routesArray.getJSONObject(0);
+                           JSONObject poly = route.getJSONObject("overview_polyline");
+                           String polyline = poly.getString("points");
+
+                           // Decode polyline points
+                           List<LatLng> points = PolyUtil.decode(polyline);
+
+                           // Draw the route on the map
+                           PolylineOptions options = new PolylineOptions();
+                           options.addAll(points);
+                           options.color(Color.RED);
+                           myMap.addPolyline(options);
+                       } catch (JSONException e) {
+                       Log.e("FetchDataTask", "Json parsing error: " + e.getMessage());
+                        }
+                   }
+               }, new Response.ErrorListener() {
+           @Override
+           public void onErrorResponse(VolleyError error) {
+               // Handle error
+           }
+       });
+    }
+*/
+
+
 }
