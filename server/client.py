@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask import request
 
 import edit_db
@@ -18,6 +18,11 @@ def get_numar():
     if numar is not None:
         handle_data(numar.get("id"), numar.get("timestamp"), numar.get("distance"))
     return '', 200
+
+@app.route('/percentage/<int:id>', methods=['GET'])
+def percentage_route(id):
+    result = edit_db.get_percentage(id)
+    return jsonify(result)
     
 def handle_data(id, time, distance):
     global request_counter, car_counter
