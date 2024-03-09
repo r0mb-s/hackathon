@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">smartcity</string>
+    <string name="maps_api">AIzaSyBYAP6_lWOyHXfQmFqGQz964ZR2sanUnJo</string>
+    <string name="title_activity_start">Start</string>
+    <string name="start_gif"> smartcity\elements\car.gif </string>
+
+</resources>
