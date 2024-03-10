@@ -10,8 +10,8 @@ public class Link {
         this.pair1 = pair1;
         this.pair2 = pair2;
     }
-    
-    public void updateColor(GoogleMap map)
+
+    public void updateColor()
     {
         polylineOptions.setColor(getHexColor((pair1.percentage + pair2.percentage)/2));
         polylineOptions.invalidate();
