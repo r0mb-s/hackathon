@@ -14,7 +14,7 @@ async def post_data(session, url, sensor_id):
 
 async def main():
     sensors = 20
-    url = 'http://192.168.222.153:5000/data'
+    url = 'http://192.168.207.153:5000/data'
     async with aiohttp.ClientSession() as session:
         while True:
             tasks = [post_data(session, url, i) for i in range(2, 20)]
