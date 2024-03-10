@@ -69,7 +69,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
     private SearchView mapSearchView;
     private final int FINE_PERMISSION_CODE = 1;
     private List<Pinpoint> pinpoints;
-
+    private List<Link> links;
     private volatile boolean isActivityRunning = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -96,6 +96,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
     protected void onCreate(Bundle savedInstanceState) {
 
         pinpoints = new ArrayList<Pinpoint>() ;
+        links = new ArrayList<>();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
         mapSearchView = findViewById(R.id.map_search);
@@ -148,7 +149,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
             @Override
             public void run() {
                 while (isActivityRunning) {
-                    new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
+                    new FetchDataTask().execute("http:/192.168.207.153:5000/location_and_percentage");
 
                     try {
                         Thread.sleep(1000); // Adjust the sleep time as needed
@@ -187,8 +188,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         LatLng current_location = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         myMap.addMarker(new MarkerOptions().position(current_location).title("Current Location"));
         myMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current_location, 14.0f));
-        getDirections(45.76011756878361, 21.218371237283456,
-        45.76308144719734, 21.210420656098492);
+
         //new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
         //create_link();
     }
@@ -293,6 +293,24 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
                         }
 
                     }
+                        if (ok == true) {
+                            for (int i = 0; i < pinpoints.size(); i+=2) {
+                                getDirections(pinpoints.get(i), pinpoints.get(i + 1));
+
+                            }
+                        }
+                        //  int size = links.size() - links.size() % 2;
+                        else {
+                            Log.d("sizeeee", String.valueOf(links.size()));
+                            for (int i = 0; i < links.size() - 1; i++) {
+                                Log.d("Current index iiiiiiiiii", String.valueOf(i));
+                                links.get(i).pair1 = pinpoints.get(2 * i);
+                                links.get(i).pair2 = pinpoints.get(2 * i + 1);
+
+                                links.get(i).updateColor();
+                            }
+                        }
+
 
 
                     // Update UI elements here based on extracted data
@@ -353,9 +371,9 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         return responseJsonStr;
     }
 
-    private void getDirections(double from_latitude, double from_longitude, double to_latitude, double to_longitude) {
-        String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + from_latitude + "," + from_longitude +
-                "&destination=" + to_latitude + "," + to_longitude + "&key=" + "@string/maps_api";
+    private void getDirections(Pinpoint x, Pinpoint y) {
+        String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + x.latitude + "," + x.longitude +
+                "&destination=" + y.latitude + "," + y.longitude + "&key=" + getString(R.string.maps_api);
 
 // Initialize a new RequestQueue instance
         RequestQueue queue = Volley.newRequestQueue(Map.this);
@@ -380,6 +398,10 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
                             PolylineOptions polylineOptions = new PolylineOptions();
                             polylineOptions.addAll(decodedPolyline);
                             polylineOptions.color(Color.RED); // Set color as per your choice
+                            Link l = new Link(polylineOptions, x, y);
+                            l.updateColor();
+                            links.add(l);
+
                             myMap.addPolyline(polylineOptions);
 
                         } catch (JSONException e) {
