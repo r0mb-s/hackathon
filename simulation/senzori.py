@@ -17,7 +17,7 @@ async def main():
     url = 'http://192.168.222.153:5000/data'
     async with aiohttp.ClientSession() as session:
         while True:
-            tasks = [post_data(session, url, i) for i in range(2, sensors)]
+            tasks = [post_data(session, url, i) for i in range(2, 20)]
             await asyncio.gather(*tasks)
             await asyncio.sleep(random.randint(1,3)) 
 
