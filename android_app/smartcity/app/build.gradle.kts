@@ -68,5 +68,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation ("pl.droidsonroids.gif:android-gif-drawable:1.2.22")
+    implementation("com.android.volley:volley:1.2.1")
+    implementation ("com.google.maps.android:android-maps-utils:2.2.5")
+
 
 }
