@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import com.google.maps.android.PolyUtil;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -12,20 +13,33 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.location.Geocoder;
 import android.location.Location;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.SearchView;
 import android.widget.Toast;
 import android.location.Address;
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -35,6 +49,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
@@ -54,12 +69,33 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
     private SearchView mapSearchView;
     private final int FINE_PERMISSION_CODE = 1;
     private List<Pinpoint> pinpoints;
+
+    private volatile boolean isActivityRunning = false;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    /*private Runnable runnableCode = new Runnable() {
+        @Override
+        public void run() {
+
+
+            try {
+
+                new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
+                this.wait(10000);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        }
+    };*/
+
+
     Location currentLocation;
     FusedLocationProviderClient fusedLocationProviderClient;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
-
+        pinpoints = new ArrayList<Pinpoint>() ;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
         mapSearchView = findViewById(R.id.map_search);
@@ -94,7 +130,36 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         getLastLocation();
 
     }
+    @Override
+    protected void onStart() {
+        super.onStart();
+        isActivityRunning = true;
+        startLoopingThread();
+    }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        isActivityRunning = false;
+    }
+
+    private void startLoopingThread() {
+        Thread loopingThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (isActivityRunning) {
+                    new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
+
+                    try {
+                        Thread.sleep(1000); // Adjust the sleep time as needed
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt(); // Restore interrupted status
+                    }
+                }
+            }
+        });
+        loopingThread.start();
+    }
     private void getLastLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
         {
@@ -122,7 +187,9 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         LatLng current_location = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         myMap.addMarker(new MarkerOptions().position(current_location).title("Current Location"));
         myMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current_location, 14.0f));
-        new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
+        getDirections(45.76011756878361, 21.218371237283456,
+        45.76308144719734, 21.210420656098492);
+        //new FetchDataTask().execute("http://192.168.222.153:5000/location_and_percentage");
         //create_link();
     }
 
@@ -139,18 +206,7 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
 
     }
 
-    public void pinpointLocations() {
-        Random rand = new Random();
 
-        for (int i = 1; i <= 10; i++) {
-            // Generate random latitudes and longitudes within some bounds
-            double lat = -90 + (90 - (-90)) * rand.nextDouble(); // Latitude between -90 and 90
-            double lng = -180 + (180 - (-180)) * rand.nextDouble(); // Longitude between -180 and 180
-
-            LatLng currentLocation = new LatLng(lat, lng);
-            myMap.addMarker(new MarkerOptions().position(currentLocation).title("Marker " + i).icon(setIcon(Map.this, R.drawable.baseline_flag_circle_24, "#ffffff")));
-        }
-    }
 
     public static String getHexColor(double percentage) {
 
@@ -167,11 +223,11 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
 
         return hex;
     }
-    public void pinpointLocation(double latitude, double longitude, double percentage) {
+    public Marker pinpointLocation(double latitude, double longitude, double percentage) {
         String hex = getHexColor(percentage);
 
         LatLng currentLocation = new LatLng(latitude, longitude);
-        myMap.addMarker(new MarkerOptions().position(currentLocation).title("Marker " + String.valueOf(latitude) + " " + String.valueOf(longitude)).icon(setIcon(Map.this, R.drawable.baseline_flag_circle_24, hex)));
+        return myMap.addMarker(new MarkerOptions().position(currentLocation).title("Marker " + String.valueOf(latitude) + " " + String.valueOf(longitude)).icon(setIcon(Map.this, R.drawable.circle_1, hex)));
     }
 
     public BitmapDescriptor setIcon(Activity context, int drawableID, String color) {
@@ -202,11 +258,15 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
             if (result != null) {
                 try {
                     Log.e("This is the result: ", result);
-                    pinpoints = new ArrayList<Pinpoint>() ;
+
                     JSONObject jsonObject = new JSONObject(result);
 
                     // Iterate over the keys of the JSONObject
                     Iterator<String> keys = jsonObject.keys();
+                    boolean ok = true;
+                    if (pinpoints.size() != 0)
+                        ok = false;
+
                     while (keys.hasNext()) {
                         String key = keys.next();
                         JSONArray coordinates = jsonObject.getJSONArray(key); // Get the JSONArray associated with the key
@@ -215,9 +275,22 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
                         double latitude = coordinates.getDouble(0);
                         double longitude = coordinates.getDouble(1);
                         double percentage = coordinates.getDouble(2);
-                        Pinpoint p = new Pinpoint(latitude, longitude, percentage);
-                        pinpoints.add(p);
-                        pinpointLocation(latitude, longitude, percentage);
+
+                        if (ok == true) {
+                            Pinpoint p = new Pinpoint(latitude, longitude, percentage, Integer.parseInt(key));
+                            p.marker = pinpointLocation(latitude, longitude, percentage);
+                            pinpoints.add(p);
+                        }
+                        else {
+                            for (Pinpoint i : pinpoints) {
+                                if (i.id == Integer.parseInt(key))
+                                {
+                                    i.percentage = percentage;
+                                    String hex = getHexColor(percentage);
+                                    i.marker.setIcon(setIcon(Map.this, R.drawable.circle_1, hex));
+                                }
+                            }
+                        }
 
                     }
 
@@ -280,44 +353,74 @@ public class Map extends AppCompatActivity implements OnMapReadyCallback {
         return responseJsonStr;
     }
 
-   /*public void create_link() {
-       String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + 45.76011756878361 + "," + 21.218371237283456 +
-               "&destination=" + 45.76308144719734 + "," + 21.210420656098492 + "&key=" + ;
+    private void getDirections(double from_latitude, double from_longitude, double to_latitude, double to_longitude) {
+        String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + from_latitude + "," + from_longitude +
+                "&destination=" + to_latitude + "," + to_longitude + "&key=" + "@string/maps_api";
 
-// Make a request to the Directions API
-       RequestQueue queue = Volley.newRequestQueue(context);
-       StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
-               new Response.Listener<String>() {
-                   @Override
-                   public void onResponse(String response) {
-                       // Parse the JSON response
-                       try {
-                           JSONObject jsonResponse = new JSONObject(response);
-                           JSONArray routesArray = jsonResponse.getJSONArray("routes");
-                           JSONObject route = routesArray.getJSONObject(0);
-                           JSONObject poly = route.getJSONObject("overview_polyline");
-                           String polyline = poly.getString("points");
+// Initialize a new RequestQueue instance
+        RequestQueue queue = Volley.newRequestQueue(Map.this);
 
-                           // Decode polyline points
-                           List<LatLng> points = PolyUtil.decode(polyline);
+// Request a string response from the provided URL
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        // Parse JSON response
+                        try {
+                            JSONObject jsonResponse = new JSONObject(response);
+                            JSONArray routes = jsonResponse.getJSONArray("routes");
+                            JSONObject route = routes.getJSONObject(0);
+                            JSONObject overviewPolyline = route.getJSONObject("overview_polyline");
+                            String encodedPolyline = overviewPolyline.getString("points");
 
-                           // Draw the route on the map
-                           PolylineOptions options = new PolylineOptions();
-                           options.addAll(points);
-                           options.color(Color.RED);
-                           myMap.addPolyline(options);
-                       } catch (JSONException e) {
-                       Log.e("FetchDataTask", "Json parsing error: " + e.getMessage());
+                            // Decode polyline points
+                            List<LatLng> decodedPolyline = PolyUtil.decode(encodedPolyline);
+
+                            // Draw polyline on the map
+                            PolylineOptions polylineOptions = new PolylineOptions();
+                            polylineOptions.addAll(decodedPolyline);
+                            polylineOptions.color(Color.RED); // Set color as per your choice
+                            myMap.addPolyline(polylineOptions);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                   }
-               }, new Response.ErrorListener() {
-           @Override
-           public void onErrorResponse(VolleyError error) {
-               // Handle error
-           }
-       });
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                // Handle error
+                Log.e("Volley Error", error.toString());
+            }
+        });
+
+// Add the request to the RequestQueue
+        queue.add(stringRequest);
     }
-*/
+
+        private void getDirections1(double from_latitude, double from_longitude, double to_latitude, double to_longitude) {
+        try {
+            Uri uri = Uri.parse("https://maps.googleapis.com/maps/api/directions/json?origin=" + from_latitude + "," + from_longitude +
+                    "&destination=" + to_latitude + "," + to_longitude + "@string/maps_api");
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.setPackage("com.google.android.apps.maps");
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+
+        /*List<LatLng> points = PolyUtil.decode(polyline);
+
+
+        PolylineOptions polylineOptions = new PolylineOptions();
+        polylineOptions.addAll(points);
+        polylineOptions.color(Color.RED); // Set color as per your choice
+        myMap.addPolyline(polylineOptions);*/
+        }
+        catch (ActivityNotFoundException e ){
+            Uri uri = Uri.parse("https://maps.googleapis.com/maps/api/directions/json?origin=" + from_latitude + "," + from_longitude +
+                    "&destination=" + to_latitude + "," + to_longitude + "@string/maps_api");
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        }
+    }
 
 
 }
